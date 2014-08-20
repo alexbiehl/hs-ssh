@@ -16,9 +16,11 @@ target: ssh
 sandbox:
 	cabal sandbox init --sandbox .cabal-sandbox
 	cd examples/simple     && cabal sandbox init --sandbox ../../.cabal-sandbox
+	cd examples/gitreceive && cabal sandbox init --sandbox ../../.cabal-sandbox
 
 ssh: sandbox
 	cabal $(action)
 
-example-simple: ssh
-	cd examples/simple && cabal $(action)
+examples: ssh
+	- cd examples/simple && cabal $(action)
+	- cd examples/gitreceive && cabal $(action)

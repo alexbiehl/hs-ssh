@@ -3,9 +3,13 @@ module Main where
 
 import SSH
 import SSH.Channel (defaultChannelConfig)
-import SSH.Session (defaultSessionConfig)
+import SSH.Session (scKeyPair, defaultSessionConfig)
+import SSH.Crypto  (rsaKeyPairFromFile)
 import Network.Socket.Internal (PortNumber(..))
 
 main :: IO ()
 main = do
-  start defaultSessionConfig defaultChannelConfig (PortNum 22)
+  keypair <- rsaKeyPairFromFile "id_rsa"
+
+  start (defaultSessionConfig { scKeyPair = keypair })
+        defaultChannelConfig (PortNum 22)

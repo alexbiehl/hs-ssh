@@ -5,7 +5,6 @@ import Control.Monad (replicateM)
 import Data.Word
 import System.IO
 import System.Random
-import qualified Codec.Crypto.SimpleAES as A
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 
@@ -110,4 +109,4 @@ encrypt (Cipher AES CBC bs _) key vector m =
           [] -> error ("encrypted data empty for `" ++ show m ++ "' in encrypt") vector
     )
   where
-    encrypted = toBlocks bs $ A.crypt A.CBC key vector A.Encrypt m
+    encrypted = toBlocks bs $ aes128cbcEncrypt key vector m

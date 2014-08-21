@@ -7,7 +7,6 @@ import Control.Monad.Trans.State
 import Data.Binary (decode, encode)
 import Data.Word
 import System.IO
-import qualified Codec.Crypto.SimpleAES as A
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as M
@@ -125,8 +124,7 @@ decrypt m
             , ssInVector = vector
             } -> do
                 let blocks = toBlocks bs m
-                    decrypted =
-                      A.crypt A.CBC key vector A.Decrypt m
+                    decrypted = aes128cbcDecrypt key vector m
 
                 modify (\ss -> ss { ssInVector = strictLBS $ last blocks })
                 return decrypted

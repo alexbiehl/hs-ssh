@@ -10,12 +10,15 @@ import Data.ASN1.Stream
 import Data.List (isPrefixOf)
 import qualified Codec.Binary.Base64.String as B64
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString as BS
 import qualified OpenSSL.DSA as DSA
 
 import Crypto.Hash.SHA1 as SHA1
 import Crypto.PubKey.HashDescr (hashDescrSHA1)
 import qualified Crypto.PubKey.RSA.PKCS15 as RSA1
 import qualified Crypto.Types.PubKey.RSA as RSA1
+
+import qualified Crypto.Cipher as CIPH
 
 import SSH.Packet
 import SSH.NetReader
@@ -123,6 +126,25 @@ blobToKey s = flip evalState s $ do
             [p, q, g, y] <- replicateM 4 readInteger
             return $ DSAPublicKey p q g y
         u -> error $ "unknown public key format: " ++ u
+
+
+aes128cbcEncrypt :: BS.ByteString -> BS.ByteString -> LBS.ByteString -> LBS.ByteString
+aes128cbcEncrypt key ivRaw = LBS.fromStrict . CIPH.cbcEncrypt (initAES128 key) iv . LBS.toStrict
+    where
+        initAES128 :: BS.ByteString -> CIPH.AES128
+        initAES128 = either (error . show) CIPH.cipherInit . CIPH.makeKey
+
+        iv = maybe (error "invalid IV") id $ CIPH.makeIV ivRaw
+
+aes128cbcDecrypt :: BS.ByteString -> BS.ByteString -> LBS.ByteString -> LBS.ByteString
+aes128cbcDecrypt key ivRaw = LBS.fromStrict . CIPH.cbcDecrypt (initAES128 key) iv . LBS.toStrict
+    where
+        initAES128 :: BS.ByteString -> CIPH.AES128
+        initAES128 = either (error . show) CIPH.cipherInit . CIPH.makeKey
+
+        iv = maybe (error "invalid IV") id $ CIPH.makeIV ivRaw
+
+
 
 sign :: KeyPair -> LBS.ByteString -> IO LBS.ByteString
 sign (RSAKeyPair kp) m = return $ LBS.concat

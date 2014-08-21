@@ -1,5 +1,7 @@
 module SSH.Crypto where
 
+import qualified SSH.KeyPair as KP
+
 import Control.Monad (replicateM)
 import Control.Monad.Trans.State
 import Data.ASN1.BinaryEncoding (BER(..))
@@ -8,11 +10,12 @@ import Data.ASN1.Stream
 import Data.Digest.Pure.SHA (bytestringDigest, sha1)
 import Data.List (isPrefixOf)
 import qualified Codec.Binary.Base64.String as B64
-import qualified Codec.Crypto.RSA as RSA
 import qualified Data.ByteString.Lazy as LBS
 import qualified OpenSSL.DSA as DSA
 
-import qualified Crypto.Types.PubKey.RSA as RSAKey
+import Crypto.PubKey.HashDescr (hashDescrSHA1)
+import qualified Crypto.PubKey.RSA.PKCS15 as RSA1
+import qualified Crypto.Types.PubKey.RSA as RSA1
 
 import SSH.Packet
 import SSH.NetReader
@@ -36,10 +39,7 @@ data HMAC =
         }
 
 data PublicKey
-    = RSAPublicKey
-        { rpubE :: Integer
-        , rpubN :: Integer
-        }
+    = RSAPublicKey RSA1.PublicKey
     | DSAPublicKey
         { dpubP :: Integer
         , dpubQ :: Integer
@@ -49,48 +49,30 @@ data PublicKey
     deriving (Eq, Show)
 
 data KeyPair
-    = RSAKeyPair
-        { rprivPub :: PublicKey
-        , rprivD :: Integer
-        }
+    = RSAKeyPair RSA1.KeyPair
+
     | DSAKeyPair
         { dprivPub :: PublicKey
         , dprivX :: Integer
         }
     deriving (Eq, Show)
 
+defaultKeyPair :: KeyPair
+defaultKeyPair = RSAKeyPair (RSA1.KeyPair defaultPrivateKey)
+    where
+        defaultPublicKey  = RSA1.PublicKey 0 0 0
+        defaultPrivateKey = RSA1.PrivateKey defaultPublicKey 0 0 0 0 0 0
+
+keyPairPublicKey :: KeyPair -> PublicKey
+keyPairPublicKey (RSAKeyPair kp)    = RSAPublicKey (RSA1.toPublicKey kp)
+keyPairPublicKey (DSAKeyPair x _)   = x
 
 rsaKeyPairFromFile :: FilePath -> IO KeyPair
 rsaKeyPairFromFile fn = do
-    x <- readFile fn
-    let asn1
-            = B64.decode
-            . concat
-            . filter (not . ("--" `isPrefixOf`))
-            . lines
-            $ x
-
-    case decodeASN1 BER (toLBS asn1) of
-        Right (Start Sequence:ss)
-            | all isIntVal (fst $ getConstructedEnd 0 ss) ->
-            let (is, _) = getConstructedEnd 0 ss
-            in return $ RSAKeyPair
-                { rprivPub = RSAPublicKey
-                    { rpubE = intValAt 2 is
-                    , rpubN = intValAt 1 is
-                    }
-                , rprivD = intValAt 3 is
-                }
-        Right u -> error ("unknown ASN1 decoding result: " ++ show u)
-        Left e -> error ("ASN1 decoding of private key failed: " ++ show e)
-  where
-    isIntVal (IntVal _) = True
-    isIntVal _ = False
-
-    intValAt i is =
-        case is !! i of
-            IntVal n -> n
-            x -> error ("not an IntVal: " ++ show x)
+    keyPair <- KP.rsaKeyPairFromFile fn
+    return $ case keyPair of
+        Left _  -> error "Could not read keypair from file"
+        Right x -> RSAKeyPair x
 
 generator :: Integer
 generator = 2
@@ -117,10 +99,10 @@ modexp = modexp' 1
         | otherwise = modexp' y ((z ^ (2 :: Integer)) `mod` n) (e `div` 2) n
 
 blob :: PublicKey -> LBS.ByteString
-blob (RSAPublicKey e n) = doPacket $ do
+blob (RSAPublicKey publicKey) = doPacket $ do
     string "ssh-rsa"
-    integer e
-    integer n
+    integer (RSA1.public_e publicKey)
+    integer (RSA1.public_n publicKey)
 blob (DSAPublicKey p q g y) = doPacket $ do
     string "ssh-dss"
     integer p
@@ -136,17 +118,22 @@ blobToKey s = flip evalState s $ do
         "ssh-rsa" -> do
             e <- readInteger
             n <- readInteger
-            return $ RSAPublicKey e n
+            return $ RSAPublicKey (RSA1.PublicKey 0 n e)
         "ssh-dss" -> do
             [p, q, g, y] <- replicateM 4 readInteger
             return $ DSAPublicKey p q g y
         u -> error $ "unknown public key format: " ++ u
 
 sign :: KeyPair -> LBS.ByteString -> IO LBS.ByteString
-sign (RSAKeyPair (RSAPublicKey e n) d) m = return $ LBS.concat
+sign (RSAKeyPair kp) m = return $ LBS.concat
     [ netString "ssh-rsa"
-    , netLBS (RSA.rsassa_pkcs1_v1_5_sign RSA.ha_SHA1 (RSAKey.PrivateKey (RSAKey.PublicKey 256 n e) d 0 0 0 0 0) m)
+    , netLBS (LBS.fromStrict signature)
     ]
+    where
+        signature = case RSA1.sign Nothing hashDescrSHA1 (RSA1.toPrivateKey kp) (LBS.toStrict m) of
+            Left err -> error $ "error while signing message: " ++ show err
+            Right x  -> x
+
 sign (DSAKeyPair (DSAPublicKey p q g y) x) m = do
     (r, s) <- DSA.signDigestedDataWithDSA (DSA.tupleToDSAKeyPair (p, q, g, y, x)) digest
     return $ LBS.concat

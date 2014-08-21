@@ -86,7 +86,7 @@ defaultSessionConfig =
     SessionConfig
         { scAuthMethods = ["publickey"]
         , scAuthorize = const (return True)
-        , scKeyPair = RSAKeyPair (RSAPublicKey 0 0) 0
+        , scKeyPair = defaultKeyPair
         {-\(Password u p) ->-}
             {-return $ u == "test" && p == "test"-}
         }

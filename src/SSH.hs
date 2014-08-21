@@ -243,10 +243,8 @@ kexDHInit = do
 
     keyPair <- gets (scKeyPair . ssConfig)
 
-    let pub =
-            case keyPair of
-                RSAKeyPair { rprivPub = p } -> p
-                DSAKeyPair { dprivPub = p } -> p
+    let pub = keyPairPublicKey keyPair
+
     d <- digest e f k pub
 
     let [civ, siv, ckey, skey, cinteg, sinteg] = map (makeKey k d) ['A'..'F']

@@ -4,7 +4,6 @@ import Control.Concurrent (forkIO)
 import Control.Concurrent.Chan
 import Control.Monad (replicateM, when)
 import Control.Monad.Trans.State
-import Data.Digest.Pure.SHA (bytestringDigest, sha1)
 import Crypto.HMAC
 import Crypto.Hash.MD5
 import Crypto.Hash.SHA1
@@ -17,6 +16,9 @@ import System.Random
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as M
 import qualified Data.Serialize as S
+
+import Crypto.Hash.SHA1 as SHA1
+
 
 import SSH.Channel
 import SSH.Crypto
@@ -301,7 +303,7 @@ kexDHInit = do
         cv <- gets ssTheirVersion
         ck <- gets ssTheirKEXInit
         sk <- gets ssOurKEXInit
-        return . bytestringDigest . sha1 . doPacket $ do
+        return . LBS.fromStrict . SHA1.hashlazy . doPacket $ do
             string cv
             string version
             byteString ck

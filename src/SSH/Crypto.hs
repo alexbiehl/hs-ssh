@@ -7,12 +7,12 @@ import Control.Monad.Trans.State
 import Data.ASN1.BinaryEncoding (BER(..))
 import Data.ASN1.Encoding (decodeASN1)
 import Data.ASN1.Stream
-import Data.Digest.Pure.SHA (bytestringDigest, sha1)
 import Data.List (isPrefixOf)
 import qualified Codec.Binary.Base64.String as B64
 import qualified Data.ByteString.Lazy as LBS
 import qualified OpenSSL.DSA as DSA
 
+import Crypto.Hash.SHA1 as SHA1
 import Crypto.PubKey.HashDescr (hashDescrSHA1)
 import qualified Crypto.PubKey.RSA.PKCS15 as RSA1
 import qualified Crypto.Types.PubKey.RSA as RSA1
@@ -144,5 +144,5 @@ sign (DSAKeyPair (DSAPublicKey p q g y) x) m = do
             ]
         ]
   where
-    digest = strictLBS . bytestringDigest . sha1 $ m
+    digest = SHA1.hashlazy m
 sign _ _ = error "sign: invalid key pair"

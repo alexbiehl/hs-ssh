@@ -4,9 +4,10 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Writer
 import Data.Binary (encode)
 import Data.Bits ((.&.))
-import Data.Digest.Pure.SHA
 import Data.Word
 import qualified Data.ByteString.Lazy as LBS
+
+import Crypto.Hash.SHA1 as SHA1
 
 import SSH.Util
 
@@ -64,7 +65,7 @@ mpint i = netLBS (if LBS.head enc .&. 128 > 0
 makeKey :: Integer -> LBS.ByteString -> Char -> LBS.ByteString
 makeKey s h c = makeKey' initial
   where
-    initial = bytestringDigest . sha1 . LBS.concat $
+    initial = LBS.fromStrict . SHA1.hashlazy . LBS.concat $
         [ mpint s
         , h
         , LBS.singleton . fromIntegral . fromEnum $ c
@@ -73,6 +74,6 @@ makeKey s h c = makeKey' initial
 
     makeKey' acc = LBS.concat
         [ acc
-        , makeKey' (bytestringDigest . sha1 . LBS.concat $ [mpint s, h, acc])
+        , makeKey' (LBS.fromStrict . SHA1.hashlazy . LBS.concat $ [mpint s, h, acc])
         ]
 

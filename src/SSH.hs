@@ -4,9 +4,9 @@ import Control.Concurrent (forkIO)
 import Control.Concurrent.Chan
 import Control.Monad (replicateM, when)
 import Control.Monad.Trans.State
-import Crypto.HMAC
-import Crypto.Hash.MD5
-import Crypto.Hash.SHA1
+--import Crypto.HMAC
+-- import Crypto.Hash.MD5
+-- import Crypto.Hash.SHA1
 import Data.List (intercalate)
 import Data.List.Split (splitOn)
 import Network
